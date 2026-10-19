@@ -44,7 +44,7 @@ def evaluate(item, currency, today, settings, airports):
         raise checks.Rejected("dates missing")
     if not settings["min_nights"] <= length <= settings["max_nights"]:
         raise checks.Rejected("trip length outside 1–6 weeks")
-    routing, via = checks.check_routing(item.get("airline"), info["legs"], airports)
+    routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports)
     return {
         "price": price,
         "depart": item["departure_at"][:10],
@@ -55,7 +55,8 @@ def evaluate(item, currency, today, settings, airports):
         "stops_out": item.get("transfers"),
         "stops_back": item.get("return_transfers"),
         "to_airport": item.get("destination_airport"),
-        "via": via,
+        "via_out": via_legs[0] if via_legs else None,
+        "via_back": via_legs[1] if len(via_legs) > 1 else None,
         "routing": routing,
         "found": info["found"].isoformat(),
         "age_days": age,
@@ -105,5 +106,6 @@ def run(client, origin, settings, cities, today):
     result["calls"] = client.calls
     result["airport_names"] = {code: airports[code]["name"] for city in result["cities"]
                                for fare in city["months"].values() if fare
-                               for code in fare["via"] + [fare["to_airport"]] if code in airports}
+                               for code in (fare["via_out"] or []) + (fare["via_back"] or []) + [fare["to_airport"]]
+                               if code in airports}
     return result

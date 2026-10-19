@@ -38,6 +38,12 @@ STYLE = """
   tr.hit td { background:var(--goodbg); }
   a { color:var(--accent); }
   details summary { cursor:pointer; color:var(--muted); }
+  @media (max-width:640px) {
+    .fares table, .fares tr, .fares td { display:block; min-width:0; width:auto; }
+    .fares tr.head { display:none; }
+    .fares tr { border-bottom:1px solid var(--line); padding:8px 4px; }
+    .fares td { border:0; padding:1px 0; }
+    .fares td[data-label]::before { content:attr(data-label) ": "; color:var(--muted); font-size:.8rem; } }
 """
 
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
@@ -72,12 +78,18 @@ def google_link(fare, origin):
 
 
 def via_text(fare, names):
-    if not fare["via"]:
-        return "non-stop" if fare["stops_out"] == 0 and fare["stops_back"] == 0 else "—"
-    text = ", ".join(fare["via"])
-    if fare["routing"] == "unverified":
-        text += " (check)"
-    return text
+    """E.g. "Non-stop", "PVG both ways", "Out PVG · back CAN, SZX"; "(check)" if not all confirmed."""
+    out, back = fare["via_out"], fare["via_back"]
+    if out is None or back is None:
+        stops = [fare["stops_out"], fare["stops_back"]]
+        text = "Non-stop" if stops == [0, 0] else f"{stops[0]} stop(s) out, {stops[1]} back"
+    elif not out and not back:
+        text = "Non-stop"
+    elif out == list(reversed(back)):
+        text = f"{', '.join(out)} both ways"
+    else:
+        text = f"Out {', '.join(out) or 'non-stop'} · back {', '.join(back) or 'non-stop'}"
+    return text + (" (check)" if fare["routing"] == "unverified" else "")
 
 
 def links(fare, origin):
@@ -93,6 +105,10 @@ def render(result, origin, settings, lows, history_days, generated_at):
             if fare and fare["compelling"]:
                 deals.append((fare["price"] / city["under_aud"], city, fare))
     deals.sort(key=lambda d: d[0])
+    best_per_city = {}
+    for deal in deals:
+        best_per_city.setdefault(deal[1]["name"], deal)
+    deals = sorted(best_per_city.values(), key=lambda d: d[0])
 
     out = ["<!doctype html>", '<html lang="en-AU">', "<head>", '<meta charset="utf-8">',
            '<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -113,7 +129,7 @@ def render(result, origin, settings, lows, history_days, generated_at):
                 f'<div class="deal"><span class="price">{esc(city["name"])} {aud(fare["price"])}</span> return '
                 f'<span class="muted">(your target: under {aud(city["under_aud"])})</span><br>'
                 f'{nice_date(fare["depart"])} → {nice_date(fare["return"])}, {fare["nights"]} nights · '
-                f'{esc(fare["airline_name"])} · via {esc(via_text(fare, names))} · found {found_text(fare["age_days"])}<br>'
+                f'{esc(fare["airline_name"])} · {esc(via_text(fare, names))} · found {found_text(fare["age_days"])}<br>'
                 f'{links(fare, origin)}</div>')
     else:
         out.append('<p style="margin:0">Nothing under your target prices today.</p>')
@@ -127,18 +143,28 @@ def render(result, origin, settings, lows, history_days, generated_at):
         if not seen:
             out.append('<p style="margin:0">No real fare found recently for any month.</p></section>')
             continue
-        out.append('<div class="table"><table><tr><th>Departing</th><th>Best real fare</th><th>Dates</th>'
-                   '<th>Airline</th><th>Via</th><th>Found</th><th></th></tr>')
+        out.append('<div class="table fares"><table><tr class="head"><th>Departing</th><th>Best real fare</th><th>Dates</th>'
+                   '<th>Airline</th><th>Connections</th><th>Found</th><th></th></tr>')
+        empty = []
+
+        def flush_empty():
+            if empty:
+                label = nice_month(empty[0]) + (f" – {nice_month(empty[-1])}" if len(empty) > 1 else "")
+                out.append(f'<tr><td><strong>{label}</strong></td><td colspan="6" class="muted">No recent fare</td></tr>')
+                empty.clear()
+
         for month, fare in city["months"].items():
             if not fare:
-                out.append(f'<tr><td>{nice_month(month)}</td><td colspan="6" class="muted">No recent fare</td></tr>')
+                empty.append(month)
                 continue
+            flush_empty()
             row_class = ' class="hit"' if fare["compelling"] else ""
             out.append(
-                f'<tr{row_class}><td>{nice_month(month)}</td><td><strong>{aud(fare["price"])}</strong></td>'
-                f'<td>{nice_date(fare["depart"])} → {nice_date(fare["return"])}<br><span class="muted small">{fare["nights"]} nights</span></td>'
-                f'<td>{esc(fare["airline_name"])}</td><td>{esc(via_text(fare, names))}</td>'
-                f'<td>{found_text(fare["age_days"])}</td><td>{links(fare, origin)}</td></tr>')
+                f'<tr{row_class}><td><strong>{nice_month(month)}</strong></td><td data-label="Fare"><strong>{aud(fare["price"])}</strong></td>'
+                f'<td data-label="Dates">{nice_date(fare["depart"])} → {nice_date(fare["return"])} <span class="muted small">({fare["nights"]} nights)</span></td>'
+                f'<td data-label="Airline">{esc(fare["airline_name"])}</td><td data-label="Connections">{esc(via_text(fare, names))}</td>'
+                f'<td data-label="Found">{found_text(fare["age_days"])}</td><td>{links(fare, origin)}</td></tr>')
+        flush_empty()
         out.append("</table></div></section>")
 
     out.append("<section><details><summary>How this was checked</summary><div class=\"small\">")

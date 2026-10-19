@@ -46,7 +46,7 @@ class EvaluateTest(unittest.TestCase):
     def test_good_fare_kept(self):
         fare = self.ev(item())
         self.assertEqual((fare["price"], fare["nights"], fare["age_days"]), (900, 17, 1))
-        self.assertEqual((fare["routing"], fare["via"]), ("verified", ["PVG"]))
+        self.assertEqual((fare["routing"], fare["via_out"], fare["via_back"]), ("verified", ["PVG"], ["PVG"]))
         self.assertTrue(fare["link"].startswith("https://www.aviasales.com/search/"))
 
     def assertDropped(self, it, reason, currency="aud"):
@@ -119,6 +119,15 @@ class RunAndReportTest(unittest.TestCase):
         page = report.render(result, "SYD", SETTINGS, {}, 0, "now")
         self.assertIn("Nothing under your target prices today.", page)
         self.assertIn("No real fare found recently", page)
+
+    def test_one_highlight_per_city(self):
+        cities = CITIES + [{"name": "Osaka", "airports": ["OSA"], "under_aud": 1000}]
+        fares = [item(price=800), item(price=850, depart="2027-02-03T12:00:00+11:00", ret="2027-02-20T10:00:00+09:00")]
+        result = scan.run(FakeClient(fares), "SYD", dict(SETTINGS, months_ahead=4), cities, TODAY)
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now")
+        self.assertEqual(page.count('class="deal"'), 2)          # one Tokyo, one Osaka, not two Tokyo
+        self.assertIn("PVG both ways", page)
+        self.assertIn("Oct 2026 – Dec 2026", page)             # empty months collapsed into one row
 
     def test_every_price_on_the_page_is_aud(self):
         result = scan.run(FakeClient([item(price=950)]), "SYD", SETTINGS, CITIES, TODAY)

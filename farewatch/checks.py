@@ -92,22 +92,23 @@ def nights(departure_at, return_at):
 
 
 def check_routing(airline, legs, airports):
-    """Return (status, via) where status is "verified" or "unverified"; raise Rejected if banned.
+    """Return (status, via_per_leg); raise Rejected if the trip may not be flown this way.
 
+    status is "verified" when every connection airport is known, else "unverified".
     `airports` maps IATA airport code -> {"country": ISO code, "name": str}.
     """
     if airline in EXCLUDED_CARRIERS:
         raise Rejected("Middle East / Türkiye airline")
-    via, known = [], bool(legs)
+    known = bool(legs)
+    via_per_leg = []
     for leg in legs:
+        stops = []
         for code in leg[1:-1]:
             info = airports.get(code)
             if info is None:
                 known = False
-                via.append(code)
-                continue
-            if info["country"] in EXCLUDED_COUNTRIES:
+            elif info["country"] in EXCLUDED_COUNTRIES:
                 raise Rejected("connects in Middle East / Türkiye")
-            via.append(code)
-    unique = list(dict.fromkeys(via))
-    return ("verified" if known else "unverified"), unique
+            stops.append(code)
+        via_per_leg.append(stops)
+    return ("verified" if known else "unverified"), via_per_leg
