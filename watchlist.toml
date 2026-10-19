@@ -1,0 +1,46 @@
+# Sydney Fare Watch — the owner's watchlist (edit freely).
+# Each entry is one city. "airports" are the IATA codes searched; "under_aud" is the target
+# return fare in Australian dollars for 1 adult, economy. A fare at or below it is "compelling".
+
+origin = "SYD"
+
+[settings]
+min_nights = 7               # 1 week
+max_nights = 42              # 6 weeks
+months_ahead = 12            # this month plus the next 12
+max_age_days = 3             # a fare must have been found by a real search within this many days
+
+[[city]]
+name = "Paris"
+airports = ["PAR"]          # Charles de Gaulle and Orly
+under_aud = 1300
+
+[[city]]
+name = "London"
+airports = ["LON"]          # Heathrow, Gatwick and the other London airports
+under_aud = 1300
+
+[[city]]
+name = "Tokyo"
+airports = ["TYO"]          # Haneda and Narita
+under_aud = 1000
+
+[[city]]
+name = "Osaka / Kyoto"
+airports = ["OSA"]          # Kansai (KIX) and Itami; Kyoto has no airport, Kansai is the usual gateway
+under_aud = 1000
+
+[[city]]
+name = "Shanghai"
+airports = ["SHA"]          # Pudong and Hongqiao
+under_aud = 1000
+
+[[city]]
+name = "Guangzhou"
+airports = ["CAN"]
+under_aud = 1000
+
+[[city]]
+name = "Hong Kong"
+airports = ["HKG"]
+under_aud = 1000
