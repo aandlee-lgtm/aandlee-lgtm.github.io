@@ -39,6 +39,36 @@ class LinkTest(unittest.TestCase):
         self.assertEqual((info["found"], info["currency"], info["price"], info["legs"]), (None, None, None, []))
 
 
+class LoyaltyTest(unittest.TestCase):
+    PROGRAMS = [{"name": "Velocity", "airlines": {"VA", "SQ"}}, {"name": "Sky Pearl", "airlines": {"CZ", "MF", "3U"}}]
+
+    def test_carriers_read_from_link(self):
+        self.assertEqual(checks.parse_link(link())["carriers"], ["MU"])
+        self.assertEqual(checks.parse_link("/s?t=3U17989776001799096100002095SYDCANNRT_x")["carriers"], ["3U"])
+        self.assertEqual(checks.parse_link("/s?t=CZMU17989776001799096100002095SYDCANNRT_x")["carriers"], ["CZ", "MU"])
+
+    def test_badges(self):
+        self.assertEqual(checks.loyalty_badges(["CZ"], self.PROGRAMS), [("Sky Pearl", "all")])
+        self.assertEqual(checks.loyalty_badges(["CZ", "MU"], self.PROGRAMS), [("Sky Pearl", "part")])
+        self.assertEqual(checks.loyalty_badges(["SQ"], self.PROGRAMS), [("Velocity", "all")])
+        self.assertEqual(checks.loyalty_badges(["TR"], self.PROGRAMS), [])
+
+    def test_badge_on_page(self):
+        cz = item(price=900, airline="CZ")
+        cz["link"] = cz["link"].replace("t=MU", "t=CZ")
+        result = scan.run(FakeClient([cz]), "SYD", SETTINGS, CITIES, TODAY, self.PROGRAMS)
+        fare = result["cities"][0]["months"]["2027-01"]
+        self.assertEqual(fare["loyalty"], [("Sky Pearl", "all")])
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now")
+        self.assertIn('class="badge" title="May earn Sky Pearl', page)
+
+    def test_owner_programmes_load(self):
+        names = {p["name"]: p["airlines"] for p in scan.load_loyalty("watchlist.toml")}
+        self.assertIn("CZ", names["Sky Pearl"])
+        self.assertIn("VA", names["Velocity"])
+        self.assertNotIn("QR", names["Velocity"])          # excluded by the transit rule anyway
+
+
 class EvaluateTest(unittest.TestCase):
     def ev(self, it, currency="aud"):
         return scan.evaluate(it, currency, TODAY, SETTINGS, AIRPORTS)
@@ -147,6 +177,17 @@ class HistoryTest(unittest.TestCase):
                 history.append(path, result)
                 lows, days = history.lowest_recent(path, TODAY.isoformat())
                 self.assertEqual(lows, {} if day < 14 else {"Tokyo": 950})
+
+
+class HistorySameDayTest(unittest.TestCase):
+    def test_second_scan_same_day_replaces_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "h.jsonl")
+            result = scan.run(FakeClient([item(price=950)]), "SYD", SETTINGS, CITIES, TODAY)
+            history.append(path, result)
+            history.append(path, result)
+            with open(path) as handle:
+                self.assertEqual(len(handle.readlines()), 1)
 
 
 class WatchlistTest(unittest.TestCase):

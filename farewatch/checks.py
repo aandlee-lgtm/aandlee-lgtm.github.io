@@ -32,8 +32,9 @@ class Rejected(Exception):
 def parse_link(link):
     """Read what the Aviasales link itself says about the fare.
 
-    Returns found date, the currency and amount the link was created for, and the airports
-    flown on each leg (from the `t` parameter, e.g. SYDPVGNRT). Missing parts are None.
+    Returns found date, the currency and amount the link was created for, the airports flown on
+    each leg and the airlines selling the trip (both from the `t` parameter, e.g. MU…SYDPVGNRT).
+    Missing parts are None or empty.
     """
     parsed = urllib.parse.urlparse(link or "")
     query = urllib.parse.parse_qs(parsed.query)
@@ -56,11 +57,15 @@ def parse_link(link):
     for chain in re.findall(r"(?<=\d)([A-Z]{6,})(?=\d|$)", token):
         if len(chain) % 3 == 0:
             legs.append([chain[i:i + 3] for i in range(0, len(chain), 3)])
+    head = re.match(r"([A-Z0-9]*?)\d{8}", token)
+    prefix = head.group(1) if head else ""
+    carriers = [prefix[i:i + 2] for i in range(0, len(prefix), 2)] if len(prefix) % 2 == 0 else []
     return {
         "found": found,
         "currency": (one("expected_price_currency") or "").lower() or None,
         "price": int(price) if price and price.isdigit() else None,
         "legs": legs,
+        "carriers": carriers,
     }
 
 
@@ -112,3 +117,13 @@ def check_routing(airline, legs, airports):
             stops.append(code)
         via_per_leg.append(stops)
     return ("verified" if known else "unverified"), via_per_leg
+
+
+def loyalty_badges(carriers, programs):
+    """[(programme name, "all" | "part")] for programmes that the selling airlines earn with."""
+    badges = []
+    for program in programs:
+        earning = [code for code in carriers if code in program["airlines"]]
+        if earning:
+            badges.append((program["name"], "all" if len(earning) == len(carriers) else "part"))
+    return badges

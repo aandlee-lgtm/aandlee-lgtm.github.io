@@ -38,6 +38,8 @@ STYLE = """
   tr.hit td { background:var(--goodbg); }
   a { color:var(--accent); }
   details summary { cursor:pointer; color:var(--muted); }
+  .badge { display:inline-block; font-size:.72rem; font-weight:600; line-height:1.4; padding:0 6px;
+           margin-left:4px; border-radius:999px; border:1px solid var(--accent); color:var(--accent); white-space:nowrap; }
   @media (max-width:640px) {
     .fares table, .fares tr, .fares td { display:block; min-width:0; width:auto; }
     .fares tr.head { display:none; }
@@ -92,6 +94,16 @@ def via_text(fare, names):
     return text + (" (check)" if fare["routing"] == "unverified" else "")
 
 
+def badges(fare):
+    out = []
+    for name, extent in fare.get("loyalty", []):
+        title = (f"May earn {name} — depends on fare class; check before booking" if extent == "all"
+                 else f"Some flights may earn {name} — depends on fare class; check before booking")
+        label = esc(name) + ("" if extent == "all" else " (part)")
+        out.append(f'<span class="badge" title="{esc(title)}">{label}</span>')
+    return "".join(out)
+
+
 def links(fare, origin):
     return (f'<a href="{esc(fare["link"])}" rel="nofollow noopener" target="_blank">View fare</a>'
             f' · <a href="{esc(google_link(fare, origin))}" rel="nofollow noopener" target="_blank">Google Flights</a>')
@@ -120,7 +132,9 @@ def render(result, origin, settings, lows, history_days, generated_at):
            f'{settings["min_nights"] // 7}–{settings["max_nights"] // 7} week trips, up to {settings["months_ahead"]} months ahead. '
            f'All prices in <strong>Australian dollars (A$)</strong>.</p>',
            f'<p class="muted small">Only fares that real travellers\' searches found in the last {settings["max_age_days"]} days are shown. '
-           "Prices change and seats sell out: always confirm on the link before booking.</p>"]
+           "Prices change and seats sell out: always confirm on the link before booking. "
+           '<span class="badge">Velocity</span> <span class="badge">Sky Pearl</span> = the airline selling the fare '
+           "earns with that programme; points depend on the fare class, so check before booking.</p>"]
 
     out.append("<section><h2>Worth a holiday?</h2>")
     if deals:
@@ -129,7 +143,7 @@ def render(result, origin, settings, lows, history_days, generated_at):
                 f'<div class="deal"><span class="price">{esc(city["name"])} {aud(fare["price"])}</span> return '
                 f'<span class="muted">(your target: under {aud(city["under_aud"])})</span><br>'
                 f'{nice_date(fare["depart"])} → {nice_date(fare["return"])}, {fare["nights"]} nights · '
-                f'{esc(fare["airline_name"])} · {esc(via_text(fare, names))} · found {found_text(fare["age_days"])}<br>'
+                f'{esc(fare["airline_name"])}{badges(fare)} · {esc(via_text(fare, names))} · found {found_text(fare["age_days"])}<br>'
                 f'{links(fare, origin)}</div>')
     else:
         out.append('<p style="margin:0">Nothing under your target prices today.</p>')
@@ -162,7 +176,7 @@ def render(result, origin, settings, lows, history_days, generated_at):
             out.append(
                 f'<tr{row_class}><td><strong>{nice_month(month)}</strong></td><td data-label="Fare"><strong>{aud(fare["price"])}</strong></td>'
                 f'<td data-label="Dates">{nice_date(fare["depart"])} → {nice_date(fare["return"])} <span class="muted small">({fare["nights"]} nights)</span></td>'
-                f'<td data-label="Airline">{esc(fare["airline_name"])}</td><td data-label="Connections">{esc(via_text(fare, names))}</td>'
+                f'<td data-label="Airline">{esc(fare["airline_name"])}{badges(fare)}</td><td data-label="Connections">{esc(via_text(fare, names))}</td>'
                 f'<td data-label="Found">{found_text(fare["age_days"])}</td><td>{links(fare, origin)}</td></tr>')
         flush_empty()
         out.append("</table></div></section>")

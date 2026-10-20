@@ -18,6 +18,12 @@ def load_watchlist(path):
     return data.get("origin", "SYD"), settings, data["city"]
 
 
+def load_loyalty(path):
+    with open(path, "rb") as handle:
+        data = tomllib.load(handle)
+    return [{"name": p["name"], "airlines": set(p["airlines"])} for p in data.get("loyalty", {}).values()]
+
+
 def months_from(today, count):
     year, month = today.year, today.month
     for _ in range(count + 1):
@@ -27,7 +33,7 @@ def months_from(today, count):
             year, month = year + 1, 1
 
 
-def evaluate(item, currency, today, settings, airports):
+def evaluate(item, currency, today, settings, airports, programs=()):
     """Turn one API item into a shown fare, or raise checks.Rejected with the reason."""
     link = item.get("link")
     if not link:
@@ -45,6 +51,7 @@ def evaluate(item, currency, today, settings, airports):
     if not settings["min_nights"] <= length <= settings["max_nights"]:
         raise checks.Rejected("trip length outside 1–6 weeks")
     routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports)
+    carriers = info["carriers"] or [item.get("airline")]
     return {
         "price": price,
         "depart": item["departure_at"][:10],
@@ -61,10 +68,11 @@ def evaluate(item, currency, today, settings, airports):
         "found": info["found"].isoformat(),
         "age_days": age,
         "link": AVIASALES + link,
+        "loyalty": checks.loyalty_badges(carriers, programs),
     }
 
 
-def run(client, origin, settings, cities, today):
+def run(client, origin, settings, cities, today, programs=()):
     """Return the scan result: per city, the cheapest real fare for each month, plus diagnostics."""
     airports = client.airports()
     airlines = client.airlines()
@@ -89,7 +97,7 @@ def run(client, origin, settings, cities, today):
                 for item in body.get("data") or []:
                     returned += 1
                     try:
-                        fare = evaluate(item, body.get("currency"), today, settings, airports)
+                        fare = evaluate(item, body.get("currency"), today, settings, airports, programs)
                     except checks.Rejected as reason:
                         drops[str(reason)] += 1
                         continue
