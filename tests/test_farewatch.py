@@ -62,6 +62,12 @@ class LoyaltyTest(unittest.TestCase):
         page = report.render(result, "SYD", SETTINGS, {}, 0, "now")
         self.assertIn('class="badge" title="May earn Sky Pearl', page)
 
+    def test_listed_airline_and_link_airline_both_count(self):
+        mixed = item(price=1900, airline="VA")
+        mixed["link"] = mixed["link"].replace("t=MU", "t=MF")
+        fare = scan.evaluate(mixed, "aud", TODAY, SETTINGS, AIRPORTS, self.PROGRAMS)
+        self.assertEqual(fare["loyalty"], [("Velocity", "part"), ("Sky Pearl", "part")])
+
     def test_owner_programmes_load(self):
         names = {p["name"]: p["airlines"] for p in scan.load_loyalty("watchlist.toml")}
         self.assertIn("CZ", names["Sky Pearl"])

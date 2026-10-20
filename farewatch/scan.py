@@ -51,7 +51,8 @@ def evaluate(item, currency, today, settings, airports, programs=()):
     if not settings["min_nights"] <= length <= settings["max_nights"]:
         raise checks.Rejected("trip length outside 1–6 weeks")
     routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports)
-    carriers = info["carriers"] or [item.get("airline")]
+    # The listed airline and the airline(s) in the link can differ on multi-airline trips; use both.
+    carriers = [c for c in dict.fromkeys([item.get("airline")] + info["carriers"]) if c]
     return {
         "price": price,
         "depart": item["departure_at"][:10],
