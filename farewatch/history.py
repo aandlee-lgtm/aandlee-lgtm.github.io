@@ -8,7 +8,13 @@ MIN_DAYS_FOR_TREND = 14
 
 
 def append(path, result):
+    """Record today's fares; a second scan on the same day replaces that day's rows."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            kept = [line for line in handle if json.loads(line)["date"] != result["today"]]
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.writelines(kept)
     with open(path, "a", encoding="utf-8") as handle:
         for city in result["cities"]:
             for month, fare in city["months"].items():

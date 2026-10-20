@@ -25,7 +25,7 @@ def main():
     origin, settings, cities = scan.load_watchlist(args.watchlist)
     try:
         client = Client(os.environ.get("TRAVELPAYOUTS_TOKEN", ""))
-        result = scan.run(client, origin, settings, cities, now.date())
+        result = scan.run(client, origin, settings, cities, now.date(), scan.load_loyalty(args.watchlist))
     except ApiError as error:
         # Leave the existing page untouched: a failed scan must never publish an empty or invented report.
         sys.exit(f"Scan failed, page not updated: {error}")
