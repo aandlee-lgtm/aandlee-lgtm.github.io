@@ -38,6 +38,9 @@ STYLE = """
   tr.hit td { background:var(--goodbg); }
   a { color:var(--accent); }
   details summary { cursor:pointer; color:var(--muted); }
+  .trend { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .trend svg { color:var(--accent); overflow:visible; }
+  .trend .target { stroke:var(--muted); }
   .badge { display:inline-block; font-size:.72rem; font-weight:600; line-height:1.4; padding:0 6px;
            margin-left:4px; border-radius:999px; border:1px solid var(--accent); color:var(--accent); white-space:nowrap; }
   @media (max-width:640px) {
@@ -104,12 +107,61 @@ def badges(fare):
     return "".join(out)
 
 
+def short_date(iso):
+    d = dt.date.fromisoformat(iso)
+    return f"{d.day} {MONTHS[d.month - 1]}"
+
+
+def trend_html(city_name, points, target, width=200, height=40, pad=5):
+    """Sparkline of the cheapest real fare per scan day, with the target as a dashed line."""
+    if len(points) < 2:
+        return ('<div class="trend small muted">Price trend: the line appears once there are '
+                'two days of scans for this city.</div>')
+    dates = [dt.date.fromisoformat(d) for d, _ in points]
+    prices = [p for _, p in points]
+    lo, hi = min(prices), max(prices)
+    show_target = lo * 0.8 <= target <= hi * 1.25
+    if show_target:
+        lo, hi = min(lo, target), max(hi, target)
+    span_days = max((dates[-1] - dates[0]).days, 1)
+    span_price = max(hi - lo, 1)
+
+    def x(d):
+        return pad + (width - 2 * pad) * (d - dates[0]).days / span_days
+
+    def y(p):
+        return pad + (height - 2 * pad) * (hi - p) / span_price
+
+    path = " ".join(f"{'M' if i == 0 else 'L'}{x(d):.1f},{y(p):.1f}" for i, (d, p) in enumerate(zip(dates, prices)))
+    parts = [f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" '
+             f'aria-label="{esc(city_name)} cheapest real fare by day, from {aud(prices[0])} to {aud(prices[-1])}">']
+    if show_target:
+        ty = y(target)
+        parts.append(f'<line class="target" x1="{pad}" x2="{width - pad}" y1="{ty:.1f}" y2="{ty:.1f}" '
+                     'stroke-width="1" stroke-dasharray="3 3"><title>Your target</title></line>')
+    parts.append(f'<path d="{path}" fill="none" stroke="currentColor" stroke-width="2" '
+                 'stroke-linejoin="round" stroke-linecap="round"/>')
+    for i, (d, p) in enumerate(zip(dates, prices)):
+        label = f"{short_date(d.isoformat())}: {aud(p)}"
+        if i == len(prices) - 1:
+            parts.append(f'<circle cx="{x(d):.1f}" cy="{y(p):.1f}" r="4" fill="currentColor" '
+                         'stroke="var(--goodbg)" stroke-width="2"/>')
+        parts.append(f'<circle cx="{x(d):.1f}" cy="{y(p):.1f}" r="9" fill="transparent"><title>{esc(label)}</title></circle>')
+    parts.append("</svg>")
+    low = min(prices)
+    caption = (f"Cheapest real fare each day: {aud(prices[0])} on {short_date(points[0][0])} → "
+               f"{aud(prices[-1])} today · lowest {aud(low)}")
+    if show_target:
+        caption += " · dashed line = your target"
+    return f'<div class="trend">{"".join(parts)}<span class="small muted">{esc(caption)}</span></div>'
+
+
 def links(fare, origin):
     return (f'<a href="{esc(fare["link"])}" rel="nofollow noopener" target="_blank">View fare</a>'
             f' · <a href="{esc(google_link(fare, origin))}" rel="nofollow noopener" target="_blank">Google Flights</a>')
 
 
-def render(result, origin, settings, lows, history_days, generated_at):
+def render(result, origin, settings, lows, history_days, generated_at, trends=None):
     names = result.get("airport_names", {})
     deals = []
     for city in result["cities"]:
@@ -139,12 +191,16 @@ def render(result, origin, settings, lows, history_days, generated_at):
     out.append("<section><h2>Worth a holiday?</h2>")
     if deals:
         for _, city, fare in deals[:3]:
+            past = sorted((trends or {}).get(city["name"], {}).items())
+            today_low = min(f["price"] for f in city["months"].values() if f)
+            points = past + [(result["today"], today_low)]
             out.append(
                 f'<div class="deal"><span class="price">{esc(city["name"])} {aud(fare["price"])}</span> return '
                 f'<span class="muted">(your target: under {aud(city["under_aud"])})</span><br>'
                 f'{nice_date(fare["depart"])} → {nice_date(fare["return"])}, {fare["nights"]} nights · '
                 f'{esc(fare["airline_name"])}{badges(fare)} · {esc(via_text(fare, names))} · found {found_text(fare["age_days"])}<br>'
-                f'{links(fare, origin)}</div>')
+                f'{links(fare, origin)}'
+                f'{trend_html(city["name"], points, city["under_aud"])}</div>')
     else:
         out.append('<p style="margin:0">Nothing under your target prices today.</p>')
     out.append("</section>")

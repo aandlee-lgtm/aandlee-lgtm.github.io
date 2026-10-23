@@ -31,7 +31,8 @@ def main():
         sys.exit(f"Scan failed, page not updated: {error}")
 
     lows, days = history.lowest_recent(args.history, result["today"])
-    page = report.render(result, origin, settings, lows, days, now.strftime("%a %-d %b %Y, %-I:%M %p"))
+    trends = history.daily_lows(args.history, result["today"])
+    page = report.render(result, origin, settings, lows, days, now.strftime("%a %-d %b %Y, %-I:%M %p"), trends)
     with open(args.out, "w", encoding="utf-8") as handle:
         handle.write(page)
     if not args.no_history:
