@@ -196,6 +196,33 @@ class HistorySameDayTest(unittest.TestCase):
                 self.assertEqual(len(handle.readlines()), 1)
 
 
+class TrendTest(unittest.TestCase):
+    def test_daily_lows_from_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "h.jsonl")
+            for day, price in (("2026-10-17", 990), ("2026-10-18", 950)):
+                result = scan.run(FakeClient([item(price=price)]), "SYD", SETTINGS, CITIES, TODAY)
+                result["today"] = day
+                history.append(path, result)
+            self.assertEqual(history.daily_lows(path, TODAY.isoformat()),
+                             {"Tokyo": {"2026-10-17": 990, "2026-10-18": 950}})
+
+    def test_trend_line_on_highlight(self):
+        result = scan.run(FakeClient([item(price=900)]), "SYD", SETTINGS, CITIES, TODAY)
+        trends = {"Tokyo": {"2026-10-17": 990, "2026-10-18": 950}}
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now", trends)
+        self.assertIn('<svg width="200"', page)
+        self.assertIn("A$990 on 17 Oct → A$900 today · lowest A$900", page)
+        self.assertIn("<title>18 Oct: A$950</title>", page)
+        self.assertEqual(page.count("<svg"), 1)           # only in the "Worth a holiday?" section
+
+    def test_no_line_with_one_day(self):
+        result = scan.run(FakeClient([item(price=900)]), "SYD", SETTINGS, CITIES, TODAY)
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now", {})
+        self.assertNotIn("<svg", page)
+        self.assertIn("line appears once there are two days of scans", page)
+
+
 class WatchlistTest(unittest.TestCase):
     def test_owner_watchlist_loads(self):
         origin, settings, cities = scan.load_watchlist("watchlist.toml")
