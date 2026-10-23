@@ -223,12 +223,82 @@ class TrendTest(unittest.TestCase):
         self.assertIn("line appears once there are two days of scans", page)
 
 
+LOOKOUT = {"name": "Sydney → Adelaide", "destination": "ADL", "date": "2026-11-24",
+           "airline": "VA", "depart_before": "12:00"}
+
+
+def one_way(price=189, departs="2026-11-24T07:10:00+11:00", airline="VA", found="18102026"):
+    return {"price": price, "departure_at": departs, "airline": airline, "flight_number": "410",
+            "transfers": 0, "destination_airport": "ADL",
+            "link": (f"/search/SYD2411ADL1?t={airline}17949852001794990900000125SYDADL_abc_1&search_date={found}"
+                     f"&expected_price_currency=aud&expected_price={price}")}
+
+
+class LookoutClient(FakeClient):
+    def __init__(self, fares):
+        super().__init__([])
+        self.fares = fares
+
+    def one_way_for_date(self, origin, destination, date):
+        return {"success": True, "currency": "aud", "data": self.fares}
+
+
+class LookoutTest(unittest.TestCase):
+    PROGRAMS = [{"name": "Velocity", "airlines": {"VA"}}]
+
+    def ev(self, it):
+        return scan.evaluate_lookout(it, "aud", TODAY, SETTINGS, AIRPORTS, self.PROGRAMS, LOOKOUT)
+
+    def test_virgin_morning_fare_kept(self):
+        fare = self.ev(one_way())
+        self.assertEqual((fare["price"], fare["depart_time"], fare["loyalty"]), (189, "07:10", [("Velocity", "all")]))
+
+    def test_filters(self):
+        for it, reason in ((one_way(departs="2026-11-24T13:05:00+11:00"), "not in the morning"),
+                           (one_way(airline="JQ"), "other airline"),
+                           (one_way(departs="2026-11-25T07:10:00+11:00"), "other date"),
+                           (one_way(found="01102026"), "older than limit")):
+            with self.assertRaises(checks.Rejected) as caught:
+                self.ev(it)
+            self.assertEqual(str(caught.exception), reason)
+
+    def test_cheapest_kept_and_recorded(self):
+        client = LookoutClient([one_way(price=219), one_way(price=189), one_way(price=99, airline="JQ")])
+        result = scan.run(client, "SYD", SETTINGS, CITIES, TODAY, self.PROGRAMS, [LOOKOUT])
+        entry = result["lookouts"][0]
+        self.assertEqual((entry["fare"]["price"], entry["drops"]), (189, {"other airline": 1}))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "h.jsonl")
+            history.append(path, result)
+            self.assertEqual(history.lookout_lows(path, "2026-10-20"), {"Sydney → Adelaide": {"2026-10-19": 189}})
+            self.assertEqual(history.daily_lows(path, "2026-10-20"), {})     # lookouts kept apart from cities
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now", {}, {"Sydney → Adelaide": {"2026-10-17": 240}})
+        self.assertIn("<h2>Lookout</h2>", page)
+        self.assertIn("A$189</strong> · VA410 departs 7:10 am · non-stop", page)
+        self.assertIn("A$240 on 17 Oct → A$189 today", page)
+        self.assertIn("Search this morning on Google Flights (A$)", page)
+
+    def test_no_fare_still_useful(self):
+        result = scan.run(LookoutClient([]), "SYD", SETTINGS, CITIES, TODAY, self.PROGRAMS, [LOOKOUT])
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now")
+        self.assertIn("No real fare for this flight in today's data", page)
+        self.assertIn("curr=AUD", page)
+
+    def test_passed_date(self):
+        result = scan.run(LookoutClient([one_way()]), "SYD", SETTINGS, CITIES, dt.date(2026, 11, 25),
+                          self.PROGRAMS, [LOOKOUT])
+        self.assertTrue(result["lookouts"][0]["passed"])
+        self.assertIn("This flight date has passed.", report.render(result, "SYD", SETTINGS, {}, 0, "now"))
+
+
 class WatchlistTest(unittest.TestCase):
     def test_owner_watchlist_loads(self):
         origin, settings, cities = scan.load_watchlist("watchlist.toml")
         self.assertEqual(origin, "SYD")
         self.assertEqual((settings["min_nights"], settings["max_nights"]), (7, 42))
         self.assertEqual({c["name"]: c["under_aud"] for c in cities}["Paris"], 1300)
+        lookout = scan.load_lookouts("watchlist.toml")[0]
+        self.assertEqual((lookout["destination"], lookout["date"], lookout["airline"]), ("ADL", "2026-11-24", "VA"))
 
 
 if __name__ == "__main__":

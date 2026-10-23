@@ -25,14 +25,16 @@ def main():
     origin, settings, cities = scan.load_watchlist(args.watchlist)
     try:
         client = Client(os.environ.get("TRAVELPAYOUTS_TOKEN", ""))
-        result = scan.run(client, origin, settings, cities, now.date(), scan.load_loyalty(args.watchlist))
+        result = scan.run(client, origin, settings, cities, now.date(), scan.load_loyalty(args.watchlist),
+                          scan.load_lookouts(args.watchlist))
     except ApiError as error:
         # Leave the existing page untouched: a failed scan must never publish an empty or invented report.
         sys.exit(f"Scan failed, page not updated: {error}")
 
     lows, days = history.lowest_recent(args.history, result["today"])
     trends = history.daily_lows(args.history, result["today"])
-    page = report.render(result, origin, settings, lows, days, now.strftime("%a %-d %b %Y, %-I:%M %p"), trends)
+    page = report.render(result, origin, settings, lows, days, now.strftime("%a %-d %b %Y, %-I:%M %p"), trends,
+                         history.lookout_lows(args.history, result["today"]))
     with open(args.out, "w", encoding="utf-8") as handle:
         handle.write(page)
     if not args.no_history:
@@ -45,6 +47,11 @@ def main():
         for month, price in shown.items():
             flag = "  <= target" if price <= city["under_aud"] else ""
             print(f"    {month}: A${price}{flag}")
+    for lookout in result["lookouts"]:
+        fare = lookout["fare"]
+        print(f"Lookout {lookout['name']} {lookout['date']}: "
+              f"{'A$' + str(fare['price']) if fare else 'no real fare'}; returned {lookout['returned']}; "
+              f"dropped {json.dumps(lookout['drops'], ensure_ascii=False)}")
     for error in result["errors"]:
         print("ERROR", error)
     print(f"{result['calls']} provider requests")

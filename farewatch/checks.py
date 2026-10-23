@@ -21,7 +21,8 @@ EXCLUDED_CARRIERS = {
     "W5", "IA", "TK", "PC", "XQ", "MS",
 }
 
-MIN_PLAUSIBLE_AUD = 150
+MIN_PLAUSIBLE_AUD = 150          # international return
+MIN_PLAUSIBLE_ONE_WAY_AUD = 30   # domestic one way (real Sydney–Adelaide fares go below A$150)
 MAX_PLAUSIBLE_AUD = 20000
 
 
@@ -69,7 +70,7 @@ def parse_link(link):
     }
 
 
-def check_aud(response_currency, price, link_info):
+def check_aud(response_currency, price, link_info, minimum=MIN_PLAUSIBLE_AUD):
     """Three independent A$ checks; raises Rejected on any failure."""
     if (response_currency or "").lower() != "aud":
         raise Rejected("not AUD (response)")
@@ -77,7 +78,7 @@ def check_aud(response_currency, price, link_info):
         raise Rejected("not AUD (link)")
     if link_info["price"] != price:
         raise Rejected("link price differs")
-    if not MIN_PLAUSIBLE_AUD <= price <= MAX_PLAUSIBLE_AUD:
+    if not minimum <= price <= MAX_PLAUSIBLE_AUD:
         raise Rejected("implausible amount")
 
 

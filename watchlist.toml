@@ -45,6 +45,15 @@ name = "Hong Kong"
 airports = ["HKG"]
 under_aud = 1000
 
+# Lookouts: one specific one-way flight to watch until its date (owner's request, 24 Oct 2026).
+# "depart_before" is local Sydney time; "airline" is the IATA code (VA = Virgin Australia).
+[[lookout]]
+name = "Sydney → Adelaide"
+destination = "ADL"
+date = "2026-11-24"
+airline = "VA"
+depart_before = "12:00"
+
 # Loyalty programmes: a fare gets a small badge when the airline(s) selling it earn with the
 # programme. Earning still depends on the fare class, which the data does not show, so the
 # badge means "may earn" — check the fare rules before booking.

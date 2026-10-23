@@ -52,6 +52,14 @@ class Client:
             "sorting": "price", "limit": 1000,
         })
 
+    def one_way_for_date(self, origin, destination, date):
+        """Cached one-way fares departing on `date` (YYYY-MM-DD), cheapest first, in AUD."""
+        return self.get("/aviasales/v3/prices_for_dates", {
+            "origin": origin, "destination": destination, "departure_at": date,
+            "one_way": "true", "currency": "aud", "market": "au",
+            "sorting": "price", "unique": "false", "limit": 1000,
+        })
+
     def airports(self):
         rows = self.get("/data/en/airports.json")
         return {row["code"]: {"country": row.get("country_code"), "name": row.get("name") or row["code"]}

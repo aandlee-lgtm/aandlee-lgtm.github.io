@@ -112,15 +112,15 @@ def short_date(iso):
     return f"{d.day} {MONTHS[d.month - 1]}"
 
 
-def trend_html(city_name, points, target, width=200, height=40, pad=5):
-    """Sparkline of the cheapest real fare per scan day, with the target as a dashed line."""
+def trend_html(city_name, points, target, width=200, height=40, pad=5,
+               empty="Price trend: the line appears once there are two days of scans for this city."):
+    """Sparkline of the cheapest real fare per scan day, with the target (if any) as a dashed line."""
     if len(points) < 2:
-        return ('<div class="trend small muted">Price trend: the line appears once there are '
-                'two days of scans for this city.</div>')
+        return f'<div class="trend small muted">{esc(empty)}</div>'
     dates = [dt.date.fromisoformat(d) for d, _ in points]
     prices = [p for _, p in points]
     lo, hi = min(prices), max(prices)
-    show_target = lo * 0.8 <= target <= hi * 1.25
+    show_target = target is not None and lo * 0.8 <= target <= hi * 1.25
     if show_target:
         lo, hi = min(lo, target), max(hi, target)
     span_days = max((dates[-1] - dates[0]).days, 1)
@@ -156,12 +156,53 @@ def trend_html(city_name, points, target, width=200, height=40, pad=5):
     return f'<div class="trend">{"".join(parts)}<span class="small muted">{esc(caption)}</span></div>'
 
 
+def lookout_search_link(origin, lookout):
+    from urllib.parse import quote
+    q = f"One way flights from {origin} to {lookout['destination']} on {lookout['date']} Virgin Australia" \
+        if lookout["airline"] == "VA" else f"One way flights from {origin} to {lookout['destination']} on {lookout['date']}"
+    return f"https://www.google.com/travel/flights?q={quote(q)}&curr=AUD&hl=en-AU&gl=AU"
+
+
+def time_text(hhmm):
+    if hhmm == "12:00":
+        return "noon"
+    hour, minute = int(hhmm[:2]), hhmm[3:]
+    return f"{(hour - 1) % 12 + 1}:{minute} {'am' if hour < 12 else 'pm'}"
+
+
+def lookout_html(lookout, origin, airlines, past, today):
+    d = dt.date.fromisoformat(lookout["date"])
+    day = f"{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.weekday()]} {nice_date(lookout['date'])}"
+    airline_name = airlines.get(lookout["airline"], lookout["airline"])
+    head = (f'<div class="deal"><span class="price">{esc(lookout["name"])}</span> '
+            f'<span class="muted">· {esc(airline_name)} · one way · {day}, leaving before '
+            f'{time_text(lookout["depart_before"])}</span><br>')
+    search = (f'<a href="{esc(lookout_search_link(origin, lookout))}" rel="nofollow noopener" target="_blank">'
+              f'Search this morning on Google Flights (A$)</a>')
+    if lookout["passed"]:
+        return head + '<span class="muted">This flight date has passed.</span></div>'
+    fare = lookout["fare"]
+    points = sorted(past.items()) + ([(today, fare["price"])] if fare else [])
+    if fare:
+        stops = "non-stop" if not fare["via"] and fare["stops"] == 0 else \
+            ("via " + ", ".join(fare["via"]) if fare["via"] else f"{fare['stops']} stop(s)")
+        body = (f'<strong>{aud(fare["price"])}</strong> · {esc(fare["airline"])}{esc(fare["flight_number"] or "")} '
+                f'departs {time_text(fare["depart_time"])} · {esc(stops)}{badges(fare)} · found {found_text(fare["age_days"])}<br>'
+                f'<a href="{esc(fare["link"])}" rel="nofollow noopener" target="_blank">View fare</a> · {search}')
+    else:
+        body = ('<span class="muted">No real fare for this flight in today\'s data. The free source holds few '
+                'domestic one-way prices, so check the live search:</span><br>' + search)
+    trend = trend_html(lookout["name"], points, None,
+                       empty="Price trend: the line appears once a real fare has been seen on two days.")
+    return head + body + trend + "</div>"
+
+
 def links(fare, origin):
     return (f'<a href="{esc(fare["link"])}" rel="nofollow noopener" target="_blank">View fare</a>'
             f' · <a href="{esc(google_link(fare, origin))}" rel="nofollow noopener" target="_blank">Google Flights</a>')
 
 
-def render(result, origin, settings, lows, history_days, generated_at, trends=None):
+def render(result, origin, settings, lows, history_days, generated_at, trends=None, lookout_trends=None):
     names = result.get("airport_names", {})
     deals = []
     for city in result["cities"]:
@@ -187,6 +228,13 @@ def render(result, origin, settings, lows, history_days, generated_at, trends=No
            "Prices change and seats sell out: always confirm on the link before booking. "
            '<span class="badge">Velocity</span> <span class="badge">Sky Pearl</span> = the airline selling the fare '
            "earns with that programme; points depend on the fare class, so check before booking.</p>"]
+
+    if result.get("lookouts"):
+        out.append("<section><h2>Lookout</h2>")
+        for lookout in result["lookouts"]:
+            out.append(lookout_html(lookout, origin, result.get("airline_names", {}),
+                                    (lookout_trends or {}).get(lookout["name"], {}), result["today"]))
+        out.append("</section>")
 
     out.append("<section><h2>Worth a holiday?</h2>")
     if deals:
