@@ -318,3 +318,18 @@
 {"date": "2026-11-07", "city": "Shanghai", "month": "2027-03", "price": 863, "depart": "2027-03-13", "return": "2027-03-31", "airline": "CZ", "found": "2026-11-06"}
 {"date": "2026-11-07", "city": "Guangzhou", "month": "2027-01", "price": 1275, "depart": "2027-01-15", "return": "2027-01-24", "airline": "TR", "found": "2026-11-04"}
 {"date": "2026-11-07", "city": "Hong Kong", "month": "2026-11", "price": 988, "depart": "2026-11-28", "return": "2026-12-05", "airline": "HO", "found": "2026-11-04"}
+{"date": "2026-11-08", "city": "London", "month": "2026-11", "price": 1219, "depart": "2026-11-11", "return": "2026-12-01", "airline": "CZ", "found": "2026-11-05"}
+{"date": "2026-11-08", "city": "London", "month": "2027-01", "price": 1732, "depart": "2027-01-26", "return": "2027-02-07", "airline": "CA", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "London", "month": "2027-06", "price": 1764, "depart": "2027-06-15", "return": "2027-07-15", "airline": "AI", "found": "2026-11-07"}
+{"date": "2026-11-08", "city": "Tokyo", "month": "2026-11", "price": 883, "depart": "2026-11-10", "return": "2026-11-24", "airline": "TR", "found": "2026-11-05"}
+{"date": "2026-11-08", "city": "Tokyo", "month": "2026-12", "price": 1110, "depart": "2026-12-01", "return": "2026-12-08", "airline": "MU", "found": "2026-11-05"}
+{"date": "2026-11-08", "city": "Tokyo", "month": "2027-01", "price": 1128, "depart": "2027-01-21", "return": "2027-02-06", "airline": "MF", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "Tokyo", "month": "2027-03", "price": 933, "depart": "2027-03-01", "return": "2027-03-12", "airline": "CZ", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "Tokyo", "month": "2027-04", "price": 1237, "depart": "2027-04-05", "return": "2027-04-20", "airline": "PR", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "Tokyo", "month": "2027-05", "price": 979, "depart": "2027-05-21", "return": "2027-05-29", "airline": "CZ", "found": "2026-11-05"}
+{"date": "2026-11-08", "city": "Osaka / Kyoto", "month": "2026-12", "price": 1200, "depart": "2026-12-04", "return": "2026-12-15", "airline": "TW", "found": "2026-11-07"}
+{"date": "2026-11-08", "city": "Shanghai", "month": "2026-11", "price": 866, "depart": "2026-11-11", "return": "2026-11-18", "airline": "MF", "found": "2026-11-07"}
+{"date": "2026-11-08", "city": "Shanghai", "month": "2027-01", "price": 796, "depart": "2027-01-28", "return": "2027-02-22", "airline": "3U", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "Shanghai", "month": "2027-02", "price": 806, "depart": "2027-02-04", "return": "2027-02-28", "airline": "CA", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "Shanghai", "month": "2027-03", "price": 864, "depart": "2027-03-13", "return": "2027-03-31", "airline": "CZ", "found": "2026-11-06"}
+{"date": "2026-11-08", "city": "Hong Kong", "month": "2026-11", "price": 931, "depart": "2026-11-08", "return": "2026-11-15", "airline": "TR", "found": "2026-11-07"}
