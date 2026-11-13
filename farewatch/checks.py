@@ -8,18 +8,23 @@ import datetime as dt
 import re
 import urllib.parse
 
-# Airports in these countries may not be used for a connection or technical stop.
-EXCLUDED_COUNTRIES = {
+# Countries whose airports may be excluded as connections (owner's setting
+# `excluded_transit_countries` in watchlist.toml). Names are used in the page and diagnostics.
+COUNTRY_NAMES = {
     "AE": "United Arab Emirates", "QA": "Qatar", "BH": "Bahrain", "SA": "Saudi Arabia",
     "OM": "Oman", "KW": "Kuwait", "JO": "Jordan", "LB": "Lebanon", "IL": "Israel", "IR": "Iran",
     "IQ": "Iraq", "SY": "Syria", "YE": "Yemen", "TR": "Türkiye", "EG": "Egypt",
 }
 
-# Airlines based there connect through their home hub, so their fares are rejected outright.
-EXCLUDED_CARRIERS = {
-    "EK", "FZ", "QR", "EY", "G9", "GF", "WY", "SV", "XY", "KU", "J9", "RJ", "ME", "LY", "IR",
-    "W5", "IA", "TK", "PC", "XQ", "MS",
+# Airlines whose fares always connect through a hub in their home country.
+HUB_CARRIER_COUNTRY = {
+    "EK": "AE", "FZ": "AE", "EY": "AE", "G9": "AE", "QR": "QA", "GF": "BH", "WY": "OM",
+    "SV": "SA", "XY": "SA", "KU": "KW", "J9": "KW", "RJ": "JO", "ME": "LB", "LY": "IL",
+    "IR": "IR", "W5": "IR", "IA": "IQ", "TK": "TR", "PC": "TR", "XQ": "TR", "MS": "EG",
 }
+
+# Since 13 Nov 2026 only Türkiye is excluded by default; the Middle East is allowed.
+DEFAULT_EXCLUDED_COUNTRIES = ("TR",)
 
 MIN_PLAUSIBLE_AUD = 150          # international return
 MIN_PLAUSIBLE_ONE_WAY_AUD = 30   # domestic one way (real Sydney–Adelaide fares go below A$150)
@@ -97,14 +102,15 @@ def nights(departure_at, return_at):
     return (back - out).days
 
 
-def check_routing(airline, legs, airports):
-    """Return (status, via_per_leg); raise Rejected if the trip may not be flown this way.
+def check_routing(airline, legs, airports, excluded=DEFAULT_EXCLUDED_COUNTRIES):
+    """Return (status, via_per_leg); raise Rejected if the trip connects in an excluded country.
 
     status is "verified" when every connection airport is known, else "unverified".
     `airports` maps IATA airport code -> {"country": ISO code, "name": str}.
     """
-    if airline in EXCLUDED_CARRIERS:
-        raise Rejected("Middle East / Türkiye airline")
+    home = HUB_CARRIER_COUNTRY.get(airline)
+    if home in excluded:
+        raise Rejected(f"{COUNTRY_NAMES.get(home, home)} airline")
     known = bool(legs)
     via_per_leg = []
     for leg in legs:
@@ -113,8 +119,8 @@ def check_routing(airline, legs, airports):
             info = airports.get(code)
             if info is None:
                 known = False
-            elif info["country"] in EXCLUDED_COUNTRIES:
-                raise Rejected("connects in Middle East / Türkiye")
+            elif info["country"] in excluded:
+                raise Rejected(f"connects in {COUNTRY_NAMES.get(info['country'], info['country'])}")
             stops.append(code)
         via_per_leg.append(stops)
     return ("verified" if known else "unverified"), via_per_leg

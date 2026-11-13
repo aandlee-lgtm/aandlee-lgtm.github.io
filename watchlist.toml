@@ -9,6 +9,9 @@ min_nights = 7               # 1 week
 max_nights = 42              # 6 weeks
 months_ahead = 12            # this month plus the next 12
 max_age_days = 3             # a fare must have been found by a real search within this many days
+# Countries a trip may not connect through (ISO codes). Since 13 Nov 2026 the Middle East (e.g. Dubai,
+# Abu Dhabi, Doha) is allowed; Türkiye stays excluded. Add e.g. "AE", "QA" to exclude them again.
+excluded_transit_countries = ["TR"]
 
 [[city]]
 name = "Paris"
@@ -86,9 +89,9 @@ depart_before = "12:00"
 # badge means "may earn" — check the fare rules before booking.
 [loyalty.velocity]
 name = "Velocity"
-# Virgin Australia and the airline partners listed by Velocity (Oct 2026): Singapore Airlines,
-# ANA, United, Air Canada, Hainan, Hong Kong Airlines, Tianjin, Beijing Capital.
-airlines = ["VA", "SQ", "NH", "UA", "AC", "HU", "HX", "GS", "JD"]
+# Virgin Australia and the airline partners listed by Velocity (Oct 2026): Qatar Airways,
+# Singapore Airlines, ANA, United, Air Canada, Hainan, Hong Kong Airlines, Tianjin, Beijing Capital.
+airlines = ["VA", "QR", "SQ", "NH", "UA", "AC", "HU", "HX", "GS", "JD"]
 
 [loyalty.skypearl]
 name = "Sky Pearl"

@@ -13,6 +13,7 @@ AIRPORTS = {
     "SYD": {"country": "AU", "name": "Sydney"}, "NRT": {"country": "JP", "name": "Narita"},
     "PVG": {"country": "CN", "name": "Shanghai Pudong"}, "CDG": {"country": "FR", "name": "Paris CDG"},
     "DOH": {"country": "QA", "name": "Doha"}, "CAN": {"country": "CN", "name": "Guangzhou"},
+    "IST": {"country": "TR", "name": "Istanbul"},
 }
 
 
@@ -72,7 +73,7 @@ class LoyaltyTest(unittest.TestCase):
         names = {p["name"]: p["airlines"] for p in scan.load_loyalty("watchlist.toml")}
         self.assertIn("CZ", names["Sky Pearl"])
         self.assertIn("VA", names["Velocity"])
-        self.assertNotIn("QR", names["Velocity"])          # excluded by the transit rule anyway
+        self.assertIn("QR", names["Velocity"])             # Qatar Airways: allowed since 13 Nov 2026
 
 
 class EvaluateTest(unittest.TestCase):
@@ -106,8 +107,17 @@ class EvaluateTest(unittest.TestCase):
         self.assertDropped(item(ret="2027-03-01T10:00:00+09:00"), "trip length outside 1–6 weeks")
 
     def test_middle_east_rejected(self):
-        self.assertDropped(item(out="SYDDOHCDG"), "connects in Middle East / Türkiye")
-        self.assertDropped(item(airline="QR"), "Middle East / Türkiye airline")
+        # Since 13 Nov 2026 the Middle East is allowed by default; Türkiye is still excluded.
+        self.assertEqual(self.ev(item(out="SYDDOHCDG"))["via_out"], ["DOH"])
+        self.assertEqual(self.ev(item(airline="QR"))["airline"], "QR")
+        self.assertDropped(item(out="SYDISTCDG"), "connects in Türkiye")
+        self.assertDropped(item(airline="TK"), "Türkiye airline")
+
+    def test_excluded_countries_are_a_setting(self):
+        strict = dict(SETTINGS, excluded_transit_countries=["TR", "QA"])
+        with self.assertRaises(checks.Rejected) as caught:
+            scan.evaluate(item(out="SYDDOHCDG"), "aud", TODAY, strict, AIRPORTS)
+        self.assertEqual(str(caught.exception), "connects in Qatar")
 
     def test_unknown_airport_is_unverified_not_hidden(self):
         fare = self.ev(item(out="SYDXXXNRT"))

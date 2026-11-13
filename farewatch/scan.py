@@ -13,7 +13,8 @@ AVIASALES = "https://www.aviasales.com"
 def load_watchlist(path):
     with open(path, "rb") as handle:
         data = tomllib.load(handle)
-    settings = {"min_nights": 7, "max_nights": 42, "months_ahead": 12, "max_age_days": 3}
+    settings = {"min_nights": 7, "max_nights": 42, "months_ahead": 12, "max_age_days": 3,
+                "excluded_transit_countries": list(checks.DEFAULT_EXCLUDED_COUNTRIES)}
     settings.update(data.get("settings", {}))
     return data.get("origin", "SYD"), settings, data["city"]
 
@@ -55,7 +56,8 @@ def evaluate(item, currency, today, settings, airports, programs=()):
         raise checks.Rejected("dates missing")
     if not settings["min_nights"] <= length <= settings["max_nights"]:
         raise checks.Rejected("trip length outside 1–6 weeks")
-    routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports)
+    routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports,
+                                              set(settings.get("excluded_transit_countries", checks.DEFAULT_EXCLUDED_COUNTRIES)))
     # The listed airline and the airline(s) in the link can differ on multi-airline trips; use both.
     carriers = [c for c in dict.fromkeys([item.get("airline")] + info["carriers"]) if c]
     return {
@@ -97,7 +99,8 @@ def evaluate_lookout(item, currency, today, settings, airports, programs, lookou
     carriers = [c for c in dict.fromkeys([item.get("airline")] + info["carriers"]) if c]
     if lookout["airline"] not in carriers:
         raise checks.Rejected("other airline")
-    routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports)
+    routing, via_legs = checks.check_routing(item.get("airline"), info["legs"], airports,
+                                              set(settings.get("excluded_transit_countries", checks.DEFAULT_EXCLUDED_COUNTRIES)))
     return {
         "price": price, "depart_time": departs[11:16], "airline": item.get("airline"),
         "flight_number": item.get("flight_number"), "stops": item.get("transfers"),
