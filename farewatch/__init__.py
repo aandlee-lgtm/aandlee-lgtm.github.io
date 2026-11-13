@@ -1,3 +1,3 @@
 """Sydney Fare Watch: a daily scan for real, recently found return fares from Sydney."""
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
