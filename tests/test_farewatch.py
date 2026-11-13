@@ -338,6 +338,38 @@ class LookoutTest(unittest.TestCase):
         self.assertIn("This flight date has passed.", report.render(result, "SYD", SETTINGS, {}, 0, "now"))
 
 
+class AllFeaturesStillPresentTest(unittest.TestCase):
+    """Release guard: one full page must still carry every feature shipped so far (1.0–1.5)."""
+
+    def test_full_page(self):
+        cz = item(price=900, airline="CZ")
+        cz["link"] = cz["link"].replace("t=MU", "t=CZ")
+        client = LookoutClient([one_way(price=189)])
+        client.items = [cz]
+        client.airlines = lambda: {"CZ": "China Southern Airlines", "VA": "Virgin Australia"}
+        programs = scan.load_loyalty("watchlist.toml")
+        result = scan.run(client, "SYD", SETTINGS, CITIES, TODAY, programs, [LOOKOUT])
+        low = {"price": 880, "depart": "2027-01-10", "return": "2027-01-24", "airline": "CZ",
+               "last_seen": "2026-10-12", "link": "https://www.aviasales.com/search/x"}
+        page = report.render(result, "SYD", SETTINGS, {"Tokyo": low}, 20, "now",
+                             {"Tokyo": {"2026-10-17": 990}}, {"Sydney → Adelaide": {"2026-10-17": 209}})
+        features = {
+            "1.0 A$ prices and live links": ["A$900", "View fare", "curr=AUD"],
+            "1.0 Travelpayouts verification": ["emrldco.com"],
+            "1.1 badge legend": ['<span class="badge">Velocity</span> <span class="badge">Sky Pearl</span>'],
+            "1.1 badge in holiday card": ['China Southern Airlines<span class="badge" title="May earn Sky Pearl'],
+            "1.1 badge in city table": ['<td data-label="Airline">China Southern Airlines<span class="badge"'],
+            "1.1 Velocity badge on lookout": ['<span class="badge" title="May earn Velocity'],
+            "1.2 trend line": ['<svg width="200"', "Cheapest real fare each day"],
+            "1.3 lookout": ["<h2>Lookout</h2>", "VA410 departs 7:10 am"],
+            "1.4 lowest recorded (trips ahead)": ["trips still ahead", "last seen 12 Oct"],
+            "1.4 premium cabin links": ["<h2>Business &amp; Premium Economy</h2>", "business%20class"],
+            "1.5 month links": ["No recent fare. Live prices on Google Flights (A$):"],
+        }
+        missing = [name for name, needles in features.items() if not all(n in page for n in needles)]
+        self.assertEqual(missing, [], "features missing from the page")
+
+
 class WatchlistTest(unittest.TestCase):
     def test_owner_watchlist_loads(self):
         origin, settings, cities = scan.load_watchlist("watchlist.toml")
