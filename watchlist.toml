@@ -20,6 +20,33 @@ name = "London"
 airports = ["LON"]          # Heathrow, Gatwick and the other London airports
 under_aud = 1300
 
+# More European cities (owner's request, 13 Nov 2026): Paris has few fares in the free data, so a
+# good fare into Europe is still caught; Paris is a short train or flight from each.
+[[city]]
+name = "Rome"
+airports = ["ROM"]          # Fiumicino and Ciampino
+under_aud = 1300
+
+[[city]]
+name = "Amsterdam"
+airports = ["AMS"]
+under_aud = 1300
+
+[[city]]
+name = "Frankfurt"
+airports = ["FRA"]
+under_aud = 1300
+
+[[city]]
+name = "Milan"
+airports = ["MIL"]          # Malpensa, Linate and Bergamo
+under_aud = 1300
+
+[[city]]
+name = "Barcelona"
+airports = ["BCN"]
+under_aud = 1300
+
 [[city]]
 name = "Tokyo"
 airports = ["TYO"]          # Haneda and Narita

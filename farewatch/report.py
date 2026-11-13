@@ -84,6 +84,16 @@ def google_link(fare, origin, cabin=""):
     return f"https://www.google.com/travel/flights?q={quote(q)}&curr=AUD&hl=en-AU&gl=AU"
 
 
+def month_link(origin, destination, month):
+    """Google Flights search for return trips departing in a given month, in A$."""
+    from urllib.parse import quote
+    year, m = month.split("-")
+    full = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
+            "October", "November", "December"][int(m) - 1]
+    q = f"Flights from {origin} to {destination} in {full} {year}"
+    return f"https://www.google.com/travel/flights?q={quote(q)}&curr=AUD&hl=en-AU&gl=AU"
+
+
 def premium_html(result, origin):
     """Links to live Business / Premium Economy prices for each city's best economy trip.
 
@@ -313,7 +323,11 @@ def render(result, origin, settings, lows, history_days, generated_at, trends=No
         def flush_empty():
             if empty:
                 label = nice_month(empty[0]) + (f" – {nice_month(empty[-1])}" if len(empty) > 1 else "")
-                out.append(f'<tr><td><strong>{label}</strong></td><td colspan="6" class="muted">No recent fare</td></tr>')
+                checks = " · ".join(
+                    f'<a href="{esc(month_link(origin, city["airports"][0], m))}" rel="nofollow noopener" '
+                    f'target="_blank">{nice_month(m).split()[0]}</a>' for m in empty)
+                out.append(f'<tr><td><strong>{label}</strong></td><td colspan="6"><span class="muted">No recent fare. '
+                           f'Live prices on Google Flights (A$):</span> {checks}</td></tr>')
                 empty.clear()
 
         for month, fare in city["months"].items():
