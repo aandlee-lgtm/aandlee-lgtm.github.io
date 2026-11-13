@@ -76,10 +76,39 @@ def found_text(age):
     return "today" if age == 0 else "yesterday" if age == 1 else f"{age} days ago"
 
 
-def google_link(fare, origin):
+def google_link(fare, origin, cabin=""):
     from urllib.parse import quote
     q = f"Flights from {origin} to {fare['to_airport']} on {fare['depart']} through {fare['return']}"
+    if cabin:
+        q += f" {cabin}"
     return f"https://www.google.com/travel/flights?q={quote(q)}&curr=AUD&hl=en-AU&gl=AU"
+
+
+def premium_html(result, origin):
+    """Links to live Business / Premium Economy prices for each city's best economy trip.
+
+    The free data source has economy fares only, so no premium price is shown or invented.
+    """
+    rows = []
+    for city in result["cities"]:
+        fares = [f for f in city["months"].values() if f]
+        if not fares:
+            continue
+        fare = min(fares, key=lambda f: f["price"])
+        rows.append(
+            f'<tr><td><strong>{esc(city["name"])}</strong></td>'
+            f'<td data-label="Dates">{nice_date(fare["depart"])} → {nice_date(fare["return"])} '
+            f'<span class="muted small">(economy from {aud(fare["price"])})</span></td>'
+            f'<td><a href="{esc(google_link(fare, origin, "premium economy"))}" rel="nofollow noopener" target="_blank">Premium Economy</a> · '
+            f'<a href="{esc(google_link(fare, origin, "business class"))}" rel="nofollow noopener" target="_blank">Business</a></td></tr>')
+    if not rows:
+        return ""
+    return ('<section><h2>Business &amp; Premium Economy</h2>'
+            '<p class="small muted" style="margin-top:0">The free fare data covers economy only, so no premium prices '
+            'are shown here. Each link opens live prices in A$ on Google Flights for the same dates as that city\'s '
+            'cheapest economy trip.</p>'
+            '<div class="table fares"><table><tr class="head"><th>City</th><th>Dates</th><th>Live prices</th></tr>'
+            + "".join(rows) + "</table></div></section>")
 
 
 def via_text(fare, names):
@@ -197,6 +226,21 @@ def lookout_html(lookout, origin, airlines, past, today):
     return head + body + trend + "</div>"
 
 
+def lowest_html(low, city, origin):
+    """The lowest recorded fare still to fly, and whether it is in today's list."""
+    listed = any(f and (f["depart"], f["return"], f["price"]) == (low["depart"], low["return"], low["price"])
+                 for f in city["months"].values())
+    what = (f'Lowest we have recorded in the last 30 days (trips still ahead): <strong>{aud(low["price"])}</strong>, '
+            f'{nice_date(low["depart"])} → {nice_date(low["return"])}')
+    if listed:
+        return f'<p class="small muted">{what} — it is in today\'s list below.</p>'
+    check = google_link({"to_airport": city["airports"][0], "depart": low["depart"], "return": low["return"]}, origin)
+    last = f' <a href="{esc(low["link"])}" rel="nofollow noopener" target="_blank">Last seen fare</a> ·' if low.get("link") else ""
+    return (f'<p class="small muted">{what}, last seen {short_date(low["last_seen"])}. Not in today\'s data, '
+            f'so it may have sold out or changed price.{last} '
+            f'<a href="{esc(check)}" rel="nofollow noopener" target="_blank">Check these dates on Google Flights (A$)</a></p>')
+
+
 def links(fare, origin):
     return (f'<a href="{esc(fare["link"])}" rel="nofollow noopener" target="_blank">View fare</a>'
             f' · <a href="{esc(google_link(fare, origin))}" rel="nofollow noopener" target="_blank">Google Flights</a>')
@@ -252,12 +296,13 @@ def render(result, origin, settings, lows, history_days, generated_at, trends=No
     else:
         out.append('<p style="margin:0">Nothing under your target prices today.</p>')
     out.append("</section>")
+    out.append(premium_html(result, origin))
 
     for city in result["cities"]:
         seen = sum(1 for fare in city["months"].values() if fare)
         out.append(f'<section><h2>{esc(city["name"])} <span class="muted small">· target under {aud(city["under_aud"])}</span></h2>')
         if city["name"] in lows:
-            out.append(f'<p class="small muted">Lowest we have recorded in the last 30 days: {aud(lows[city["name"]])}</p>')
+            out.append(lowest_html(lows[city["name"]], city, origin))
         if not seen:
             out.append('<p style="margin:0">No real fare found recently for any month.</p></section>')
             continue

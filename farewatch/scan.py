@@ -168,7 +168,7 @@ def run(client, origin, settings, cities, today, programs=(), lookouts=()):
                 best["compelling"] = best["price"] <= city["under_aud"]
             months[month] = best
         result["cities"].append({
-            "name": city["name"], "under_aud": city["under_aud"], "months": months,
+            "name": city["name"], "under_aud": city["under_aud"], "airports": city["airports"], "months": months,
             "returned": returned, "drops": dict(drops),
         })
     result["lookouts"] = [run_lookout(client, origin, lookout, today, settings, airports, programs, result["errors"])

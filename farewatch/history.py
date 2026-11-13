@@ -22,7 +22,7 @@ def append(path, result):
                     handle.write(json.dumps({
                         "date": result["today"], "city": city["name"], "month": month,
                         "price": fare["price"], "depart": fare["depart"], "return": fare["return"],
-                        "airline": fare["airline"], "found": fare["found"],
+                        "airline": fare["airline"], "found": fare["found"], "link": fare["link"],
                     }) + "\n")
         _append_lookouts(handle, result)
 
@@ -52,17 +52,30 @@ def lookout_lows(path, today):
 
 
 def lowest_recent(path, today, days=30):
-    """{city: lowest price} over the previous `days`, only once enough days are recorded."""
+    """{city: lowest recorded fare whose trip is still ahead}, once enough days are recorded.
+
+    Each value is the history row of that fare plus "last_seen" (the last scan day it appeared).
+    Fares whose departure date has passed are ignored: they can no longer be booked.
+    """
     if not os.path.exists(path):
         return {}, 0
     since = (dt.date.fromisoformat(today) - dt.timedelta(days=days)).isoformat()
-    lows, dates = {}, set()
+    lows, dates, seen = {}, set(), {}
     with open(path, encoding="utf-8") as handle:
         for line in handle:
             row = json.loads(line)
-            if "city" in row and since <= row["date"] < today:
-                dates.add(row["date"])
-                lows[row["city"]] = min(row["price"], lows.get(row["city"], row["price"]))
+            if "city" not in row or not since <= row["date"] < today:
+                continue
+            dates.add(row["date"])
+            key = (row["city"], row["depart"], row["return"], row["price"], row["airline"])
+            seen[key] = max(row["date"], seen.get(key, row["date"]))
+            if row["depart"] <= today:
+                continue
+            best = lows.get(row["city"])
+            if best is None or row["price"] < best["price"]:
+                lows[row["city"]] = dict(row)
+    for city, row in lows.items():
+        row["last_seen"] = seen[(city, row["depart"], row["return"], row["price"], row["airline"])]
     return (lows if len(dates) >= MIN_DAYS_FOR_TREND else {}), len(dates)
 
 
