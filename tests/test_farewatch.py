@@ -164,6 +164,8 @@ class RunAndReportTest(unittest.TestCase):
         self.assertEqual(page.count('class="deal"'), 2)          # one Tokyo, one Osaka, not two Tokyo
         self.assertIn("PVG both ways", page)
         self.assertIn("Oct 2026 – Dec 2026", page)             # empty months collapsed into one row
+        self.assertIn("No recent fare. Live prices on Google Flights (A$):", page)
+        self.assertIn("Flights%20from%20SYD%20to%20TYO%20in%20November%202026&amp;curr=AUD", page)
 
     def test_every_price_on_the_page_is_aud(self):
         result = scan.run(FakeClient([item(price=950)]), "SYD", SETTINGS, CITIES, TODAY)
@@ -341,7 +343,9 @@ class WatchlistTest(unittest.TestCase):
         origin, settings, cities = scan.load_watchlist("watchlist.toml")
         self.assertEqual(origin, "SYD")
         self.assertEqual((settings["min_nights"], settings["max_nights"]), (7, 42))
-        self.assertEqual({c["name"]: c["under_aud"] for c in cities}["Paris"], 1300)
+        targets = {c["name"]: c["under_aud"] for c in cities}
+        self.assertEqual(targets["Paris"], 1300)
+        self.assertEqual([targets[c] for c in ("Rome", "Amsterdam", "Frankfurt", "Milan", "Barcelona")], [1300] * 5)
         lookout = scan.load_lookouts("watchlist.toml")[0]
         self.assertEqual((lookout["destination"], lookout["date"], lookout["airline"]), ("ADL", "2026-11-24", "VA"))
 
