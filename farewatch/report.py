@@ -345,9 +345,12 @@ def render(result, origin, settings, lows, history_days, generated_at, trends=No
         out.append("</table></div></section>")
 
     out.append("<section><details><summary>How this was checked</summary><div class=\"small\">")
+    from .checks import COUNTRY_NAMES, DEFAULT_EXCLUDED_COUNTRIES
+    excluded = settings.get("excluded_transit_countries", DEFAULT_EXCLUDED_COUNTRIES)
+    banned = " or ".join(COUNTRY_NAMES.get(c, c) for c in excluded) or "no country (all connections allowed)"
     out.append("<p>Each fare shown passed every check: priced in AUD by the source, the booking link carries the same "
-               "AUD amount, found by a real search within the time limit, a 1–6 week trip, and no connection in the "
-               "Middle East or Türkiye (\"(check)\" means the connection airports could not all be confirmed). "
+               "AUD amount, found by a real search within the time limit, a 1–6 week trip, and no connection in "
+               f"{esc(banned)} (\"(check)\" means the connection airports could not all be confirmed). "
                "Source: Travelpayouts / Aviasales data; \"View fare\" opens a live Aviasales search, "
                "\"Google Flights\" opens the same dates there.</p>")
     out.append('<table><tr><th>City</th><th>Fares returned</th><th>Not shown, and why</th></tr>')
