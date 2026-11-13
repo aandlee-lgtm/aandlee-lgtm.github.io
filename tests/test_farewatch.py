@@ -182,7 +182,52 @@ class HistoryTest(unittest.TestCase):
                 result["today"] = (TODAY - dt.timedelta(days=day)).isoformat()
                 history.append(path, result)
                 lows, days = history.lowest_recent(path, TODAY.isoformat())
-                self.assertEqual(lows, {} if day < 14 else {"Tokyo": 950})
+                self.assertEqual({c: r["price"] for c, r in lows.items()}, {} if day < 14 else {"Tokyo": 950})
+
+
+class LowestRecordedTest(unittest.TestCase):
+    def history_with(self, path, fares_by_day):
+        for day, fares in fares_by_day:
+            result = scan.run(FakeClient(fares), "SYD", dict(SETTINGS, max_age_days=999), CITIES, TODAY)
+            result["today"] = day
+            history.append(path, result)
+
+    def test_departed_fares_ignored_and_last_seen(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "h.jsonl")
+            gone = item(price=700, depart="2026-10-25T10:00:00+11:00", ret="2026-11-05T10:00:00+09:00")
+            ahead = item(price=950)
+            days = [(f"2026-10-{d:02d}", [gone, ahead] if d < 10 else [ahead]) for d in range(1, 16)]
+            self.history_with(path, days)
+            lows, _ = history.lowest_recent(path, "2026-10-30")
+            self.assertEqual((lows["Tokyo"]["price"], lows["Tokyo"]["depart"]), (950, "2027-01-03"))
+            self.assertEqual(lows["Tokyo"]["last_seen"], "2026-10-15")
+            self.assertTrue(lows["Tokyo"]["link"].startswith("https://www.aviasales.com/"))
+
+    def test_page_says_whether_lowest_is_still_listed(self):
+        low = {"price": 880, "depart": "2027-01-03", "return": "2027-01-20", "airline": "MU",
+               "last_seen": "2026-10-12", "link": "https://www.aviasales.com/search/x"}
+        gone_page = report.render(scan.run(FakeClient([item(price=950)]), "SYD", SETTINGS, CITIES, TODAY),
+                                  "SYD", SETTINGS, {"Tokyo": low}, 20, "now")
+        self.assertIn("last seen 12 Oct. Not in today's data, so it may have sold out or changed price.", gone_page)
+        self.assertIn("Check these dates on Google Flights (A$)", gone_page)
+        listed_page = report.render(scan.run(FakeClient([item(price=880)]), "SYD", SETTINGS, CITIES, TODAY),
+                                    "SYD", SETTINGS, {"Tokyo": low}, 20, "now")
+        self.assertIn("it is in today's list below", listed_page)
+
+
+class PremiumTest(unittest.TestCase):
+    def test_premium_links_without_prices(self):
+        result = scan.run(FakeClient([item(price=950)]), "SYD", SETTINGS, CITIES, TODAY)
+        page = report.render(result, "SYD", SETTINGS, {}, 0, "now")
+        self.assertIn("<h2>Business &amp; Premium Economy</h2>", page)
+        self.assertIn("2027-01-20%20business%20class&amp;curr=AUD", page)
+        self.assertIn("2027-01-20%20premium%20economy&amp;curr=AUD", page)
+        self.assertIn("covers economy only", page)
+
+    def test_no_section_without_fares(self):
+        page = report.render(scan.run(FakeClient([]), "SYD", SETTINGS, CITIES, TODAY), "SYD", SETTINGS, {}, 0, "now")
+        self.assertNotIn("Business &amp; Premium Economy", page)
 
 
 class HistorySameDayTest(unittest.TestCase):
