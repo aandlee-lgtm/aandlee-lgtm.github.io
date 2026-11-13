@@ -1,8 +1,12 @@
 name: Daily fare scan
-# Every morning (about 6:17 am Sydney summer time, 5:17 am in winter): scan, rebuild index.html, publish.
+# Every morning about 6:17 am Sydney summer time (5:17 am in winter), with back-up runs an hour and
+# two hours later. GitHub sometimes drops scheduled runs; a back-up run scans only if today's
+# page has not been built yet. A manual run always scans.
 on:
   schedule:
     - cron: '17 19 * * *'
+    - cron: '17 20 * * *'
+    - cron: '17 21 * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -15,15 +19,28 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with: {fetch-depth: 30}
+      - name: Already scanned today?
+        id: today
+        run: |
+          day=$(TZ=Australia/Sydney date +%Y-%m-%d)
+          if [ "${{ github.event_name }}" = "schedule" ] && git log -30 --format=%s | grep -qx "Daily fare scan $day"; then
+            echo "Today's page ($day) is already built; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-python@v5
+        if: steps.today.outputs.skip != 'true'
         with: {python-version: '3.12'}
       - name: Unit tests
+        if: steps.today.outputs.skip != 'true'
         run: python3 -m unittest discover -s tests -t .
       - name: Scan and build the page
+        if: steps.today.outputs.skip != 'true'
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
         run: python3 -m farewatch --out index.html
       - name: Publish
+        if: steps.today.outputs.skip != 'true'
         run: |
           git config user.name "fare-watch-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
